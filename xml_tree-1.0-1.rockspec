@@ -1,7 +1,7 @@
 package = "xml_tree"
 version = "1.0-1"
 source = {
-  url = "https://github.com/dkuhlman/lua_xml_tree",
+  url = "https://github.com/dkuhlman/lua_xml_tree.git",
   tag = "v1.0"
 }
 description = {
