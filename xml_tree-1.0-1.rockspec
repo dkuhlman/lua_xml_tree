@@ -1,8 +1,8 @@
 package = "xml_tree"
 version = "1.0-1"
 source = {
-  url = "git+https://github.com/dkuhlman/lua_xml_tree.git",
-  tag = "v1.0"
+  url = "git://github.com/dkuhlman/lua_xml_tree.git",
+  tag = "v1.1"
 }
 description = {
   summary = "Build a tree of Lua objects from an XML document/file.",
