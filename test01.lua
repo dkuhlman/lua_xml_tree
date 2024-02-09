@@ -103,16 +103,6 @@ function main()
   end
 end
 
--- function main()
---   if #arg ~= 1 then
---     print('\nusage: lua test05.lua <infilename>\n')
---     os.exit(false)
---   end
---   infilename = arg[1]
---   M.test(infilename)
---   -- M.test_iterator(infilename)
--- end
-
 if pcall(debug.getlocal, 4, 1) then
   return M
 else

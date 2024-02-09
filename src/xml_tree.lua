@@ -1,12 +1,26 @@
 #!/usr/bin/env lua
 
+Doc = [[
+Usage: script [-h] [-t] [-s] <infilename>
+
+parse an XML file; build a tree of elements (XmlElementClass).
+
+Arguments:
+   infilename            Input XML file name
+
+Options:
+   -h, --help            Show this help message and exit.
+   -t, --trim            Trim surrounding white space (default: false).
+   -s, --silence         Silence.  Do not display the constructed tree (default: false, show the tree).
+]]
+
 --
 -- synopsis:
 --   parse an XML file; build a tree of elements (XmlElementClass).
 -- usage:
---   $ lua xmltest05.lua xmlinputfile.xml
---   $ lua xmltest05.lua xmlinputfile.xml --show
---   $ lua xmltest05.lua xmlinputfile.xml --show --trim
+--   $ lua xml_tree.lua xmlinputfile.xml
+--   $ lua xml_tree.lua xmlinputfile.xml --outfilepath=outfile.xml
+--   $ lua xml_tree.lua xmlinputfile.xml --show --trim
 --
 --   $ lua
 --   > xml_tree = require "xml_tree"
@@ -19,6 +33,17 @@
 local argparse = require("argparse")
 local lxp = require("lxp")
 local M = {}
+
+local f = string.format
+local function wrt(s) io.stdout:write(s) end
+
+function table.shallow_copy(t)
+  local t2 = {}
+  for k, v in pairs(t) do
+    t2[k] = v
+  end
+  return t2
+end
 
 local function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
@@ -34,10 +59,11 @@ end
 local XmlElementClass = {}
 XmlElementClass.__index = XmlElementClass
 
-function XmlElementClass.new(tag, attrib)
+function XmlElementClass.new(tag, attrib, nsmap)
   local self = setmetatable({}, XmlElementClass)
   self.tag = tag
   self.attrib = attrib
+  self.nsmap = nsmap
   self.text = ""
   self.children = {}
   return self
@@ -81,6 +107,7 @@ function XmlParserClass.new(trim)
   local self = setmetatable({}, XmlParserClass)
   self.trim = trim
   self.elstack = {}
+  self.nsmap = {}
   return self
 end
 
@@ -91,9 +118,12 @@ function XmlParserClass.start_element(self, _, name, attrib)
     table.insert(tag_table, substr)
   end
   if #tag_table == 2 then
-    name = string.format('{%s}%s', tag_table[1], tag_table[2])
+    name = f('{%s}%s', tag_table[1], tag_table[2])
   end
-  local element = XmlElementClass.new(name, attrib)
+  local element = XmlElementClass.new(
+    name,
+    attrib,
+    table.shallow_copy(self.nsmap))
   table.insert(self.elstack, element)
 end
 
@@ -117,40 +147,44 @@ function XmlParserClass.characters(self, _, str)
   end
 end
 
+function XmlParserClass.start_namespace_decl(self, _, ns_name, ns_uri)
+  self.nsmap[ns_name] = ns_uri
+end
+
+function XmlParserClass.end_namespace_decl(self, _, ns_name)
+  self.nsmap[ns_name] = nil
+end
+
 -- end class XmlParserClass
 
 -- Walk the element tree.
 -- Convert node.text of each node to upper case.
-local function to_upper_case_text(node)
-  node.text = string.upper(node.text)
-  for _, child in ipairs(node.children) do
-    to_upper_case_text(child)
-  end
-end
+-- local function to_upper_case_text(node)
+--   node.text = string.upper(node.text)
+--   for _, child in ipairs(node.children) do
+--     to_upper_case_text(child)
+--   end
+-- end
 
 -- Display information on each node in the XML tree.
 function M.show_tree(node, level, cnt)
   level = level or 0
   cnt = cnt or 1
   local filler = get_indent_filler(level)
-  print(string.format(
-    "%s%d. Tag: %s", filler, cnt, node.tag))
+  print(f("%s%d. Tag: %s", filler, cnt, node.tag))
   level = level + 1
   filler = get_indent_filler(level)
   if node.text ~= nil then
-    -- local text = trim(node.text)
     local text = node.text
     if text ~= "" then
-      print(string.format(
-        '%sText: "%s"',
-        filler, text))
+      print(f('%sText: "%s"', filler, text))
     end
   end
   if #node.attrib > 0 then
-    print(string.format('%sAttributes:', filler))
+    print(f('%sAttributes:', filler))
     for k, v in pairs(node.attrib) do
       if type(k) ~= 'number' then
-        print(string.format('%s    "%s" --> "%s"', filler, k, v))
+        print(f('%s    "%s" --> "%s"', filler, k, v))
       end
     end
   end
@@ -175,6 +209,10 @@ function M.to_tree(infilename, trim)
       xparser, name) cb_object:end_element(xparser, name) end,
     CharacterData = function (
       xparser, str) cb_object:characters(xparser, str) end,
+    StartNamespaceDecl = function (
+      xparser, ns_name, ns_uri) cb_object:start_namespace_decl(xparser, ns_name, ns_uri) end,
+    EndNamespaceDecl = function (
+      xparser, ns_name) cb_object:end_namespace_decl(xparser, ns_name) end,
   }
   -- Ask LuaExpat to deliver namespace (URI).
   local xmlparser = lxp.new(callbacks, " ")
@@ -182,27 +220,133 @@ function M.to_tree(infilename, trim)
   return cb_object.root
 end
 
+function M.to_string(node, nsmap, pretty)
+  nsmap = nsmap or {}
+  pretty = pretty or true
+end
+
+local function split_str(inputstr, sep)
+  if sep == nil then
+    sep = "%s" -- Default separator is whitespace
+  end
+  local t = {}
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+    table.insert(t, str)
+  end
+  return t
+end
+
+local function reverse_map(nsmap)
+  local revnsmap = {}
+  for k, v in pairs(nsmap) do
+    revnsmap[v] = k
+  end
+  return revnsmap
+end
+
+function M.format_tag(orig_tag, nsmap)
+  local gname
+  local revnsmap = reverse_map(nsmap)
+  local tbl = split_str(orig_tag, '}')
+  if #tbl == 2 then
+    ns = string.sub(tbl[1], 2)
+    nsprefix = revnsmap[ns]
+    qname = f('%s:%s', nsprefix, tbl[2])
+  else
+    qname = tbl[1]
+  end
+  return qname
+end
+
+function M.format_attrib(node)
+  local str = ""
+  sep = " "
+  for k, v in ipairs(node.attrib) do
+    str = str .. f('%s%s="%s"', sep, node.attrib[k], node.attrib[v])
+    sep = " "
+  end
+  for k, v in pairs(node.nsmap) do
+    str = str .. f('%sxmlns:%s="%s"', sep, k, v)
+    sep = " "
+  end
+  return str
+end
+
+--
+-- see https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+function M.escape_text(text)
+  local str = text
+  str = string.gsub(str, '&', '&amp;')
+  str = string.gsub(str, '<', '&lt;')
+  return str
+end
+
+function M.export(node, indent, args)
+  local attrib_str = M.format_attrib(node)
+  local tag_str = M.format_tag(node.tag, node.nsmap)
+  args.wrt(f('%s<%s%s>', indent, tag_str, attrib_str))
+  if #node.children > 0 then
+    args.wrt('\n')
+    local indent01 = indent .. '    '
+    for _, child in pairs(node.children) do
+      M.export(child, indent01, args)
+    end
+    args.wrt(f('%s</%s>\n', indent, tag_str))
+  else
+    local text = M.escape_text(node.text)
+    args.wrt(text)
+    args.wrt(f('</%s>\n', tag_str))
+  end
+end
+
+function M.test(args)
+  local outfile
+  local tree = M.to_tree(args.infilepath)
+  if not args.silence then
+    if args.outfilepath then
+      outfile = io.open(args.outfilepath, 'w')
+      args.wrt = function (s) outfile:write(s) end
+    else
+      args.wrt = wrt
+    end
+    M.export(tree, '', args)
+    if args.outfilepath then
+      outfile:close()
+    end
+  end
+  return tree
+end
+
 function main()
   local parser = argparse(
     "script",
-    "parse an XML file; build a tree of elements (XmlElementClass).")
-  parser:argument("infilename", "Input XML file name")
+    [[
+Synopsis:
+    Parse an XML file;
+    build a tree of elements (XmlElementClass). ]]
+    )
+  parser:argument(
+    "infilepath",
+    "Input XML file path (name)"
+    )
+  parser:option(
+    "-o --outfilepath",
+    "Write output to outfile, not stdout."
+    )
   parser:flag(
     "-t --trim",
     "Trim surrounding white space (default: false)."
     )
   parser:flag(
-    "-s --show",
-    "Display the constructed tree."
+    "-s --silence",
+    "Silence.  Do not write out the constructed tree (default: false, write the tree)."
     )
   local args = parser:parse()
-  local root = M.to_tree(args.infilename, args.trim)
-  if args.show then
-    print('--------------------------------------------')
-    M.show_tree(root, 0)
-    -- to_upper_case_text(root)
-    print('--------------------------------------------')
-  end
+  M.test(args)
+end
+
+function M.dbg()
+  print('v3')
 end
 
 if pcall(debug.getlocal, 4, 1) then
