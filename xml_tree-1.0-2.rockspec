@@ -1,7 +1,7 @@
 package = "xml_tree"
 version = "1.0-2"
 source = {
-  url = "git://github.com/dkuhlman/lua_xml_tree.git",
+  url = "git://github.com/dkuhlman/xml_tree.git",
   tag = "v1.0"
 }
 description = {
@@ -10,9 +10,9 @@ description = {
   Provides support for building a nested tree of Lua objects that represents XML data.
   Each object represents one XML element/node.
   The tree can be walked recusively.
-  Support is provided for iterating children (and decendents) of a node.
-  Call `to_tree` in order to create a tree of objects from an XML file.
-  See `test01.lua` in the Github repository for examples of use.
+  Provides support for iterating children (and decendents) of a node.
+  Call `to_tree` in order to create a tree of Lua objects from an XML file.
+  Also see `test01.lua` in the Github repository for examples of use.
   ]],
   homepage = "https://github.com/dkuhlman/lua_xml_tree",
   license = "MIT"

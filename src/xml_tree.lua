@@ -346,7 +346,7 @@ Synopsis:
 end
 
 function M.dbg()
-  print('v3')
+  print('test 03')
 end
 
 if pcall(debug.getlocal, 4, 1) then
