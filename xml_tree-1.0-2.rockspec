@@ -14,7 +14,7 @@ description = {
   Call `to_tree` in order to create a tree of Lua objects from an XML file.
   Also see `test01.lua` in the Github repository for examples of use.
   ]],
-  homepage = "https://github.com/dkuhlman/lua_xml_tree",
+  homepage = "https://github.com/dkuhlman/xml_tree",
   license = "MIT"
 }
 dependencies = {
