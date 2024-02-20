@@ -25,7 +25,7 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      xml_tree = "src/xml_tree.lua"
+      xml_tree = "xml_tree.lua"
    }
 }
 

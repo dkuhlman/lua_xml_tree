@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
 
 local argparse = require("argparse")
-local xml_tree = require('xml_tree')
+local xml_tree = require('src/xml_tree')
 
 local M = {}
 

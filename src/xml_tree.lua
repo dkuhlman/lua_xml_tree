@@ -1,41 +1,44 @@
 #!/usr/bin/env lua
 
 Doc = [[
-Usage: script [-h] [-t] [-s] <infilename>
 
-parse an XML file; build a tree of elements (XmlElementClass).
+Usage: script [-h] [-o <outfilepath>] [-t] [-s] <infilepath>
+
+Synopsis:
+    Parse an XML file;
+    build a tree of elements (XmlElementClass).
 
 Arguments:
-   infilename            Input XML file name
+   infilepath            Input XML file path (name)
 
 Options:
    -h, --help            Show this help message and exit.
+              -o <outfilepath>,
+   --outfilepath <outfilepath>
+                         Write output to outfile, not stdout.
    -t, --trim            Trim surrounding white space (default: false).
-   -s, --silence         Silence.  Do not display the constructed tree (default: false, show the tree).
+   -s, --silence         Silence.  Do not write out the constructed tree (default: false, write the tree).
+
+Usage from command line:
+
+   $ lua xml_tree.lua my_xml_doc.xml
+   $ lua xml_tree.lua --trim my_xml_doc.xml
+
+Usage in Lua REPL:
+
+   >  xml_tree = require('xml_tree')
+   >  -- Load tree from XML file.  Trim whitespace on text content.
+   >  tree = xml_tree.to_tree('my_xml_doc.xml', true)
+   >  xml_tree.show_tree(tree)
+
 ]]
 
---
--- synopsis:
---   parse an XML file; build a tree of elements (XmlElementClass).
--- usage:
---   $ lua xml_tree.lua xmlinputfile.xml
---   $ lua xml_tree.lua xmlinputfile.xml --outfilepath=outfile.xml
---   $ lua xml_tree.lua xmlinputfile.xml --show --trim
---
---   $ lua
---   > xml_tree = require "xml_tree"
---   > tree = xml_tree.to_tree('test07-01.xml' )
---   > xml_tree.show_tree(tree)
---   > tree = xml_tree.to_tree('test07-01.xml', true )
---   > xml_tree.show_tree(tree)
---
 
 local argparse = require("argparse")
 local lxp = require("lxp")
 local M = {}
 
 local f = string.format
-local function wrt(s) io.stdout:write(s) end
 
 function table.shallow_copy(t)
   local t2 = {}
@@ -111,7 +114,15 @@ function XmlParserClass.new(trim)
   return self
 end
 
-function XmlParserClass.start_element(self, _, name, attrib)
+function XmlParserClass:convert_attr(attr)
+  local attrib = {}
+  for k, value in ipairs(attr) do
+    attrib[value] = attr[value]
+  end
+  return attrib
+end
+
+function XmlParserClass:start_element(_, name, attr)
   -- split namespace and qname (tag), if necessary.
   local tag_table = {}
   for substr in string.gmatch(name, "%S+") do
@@ -120,6 +131,7 @@ function XmlParserClass.start_element(self, _, name, attrib)
   if #tag_table == 2 then
     name = f('{%s}%s', tag_table[1], tag_table[2])
   end
+  local attrib = self:convert_attr(attr)
   local element = XmlElementClass.new(
     name,
     attrib,
@@ -127,7 +139,7 @@ function XmlParserClass.start_element(self, _, name, attrib)
   table.insert(self.elstack, element)
 end
 
-function XmlParserClass.end_element(self, _, _)
+function XmlParserClass:end_element(_, _)
   local child = table.remove(self.elstack)
   if #self.elstack > 0 then
     local current = self.elstack[#self.elstack]
@@ -137,7 +149,7 @@ function XmlParserClass.end_element(self, _, _)
   end
 end
 
-function XmlParserClass.characters(self, _, str)
+function XmlParserClass:characters(_, str)
   if #str > 0 then
     if self.trim then
       str = trim(str)
@@ -220,9 +232,13 @@ function M.to_tree(infilename, trim)
   return cb_object.root
 end
 
-function M.to_string(node, nsmap, pretty)
-  nsmap = nsmap or {}
-  pretty = pretty or true
+function M.to_string(node)
+  local tbl = {}
+  local wrt = function (str) table.insert(tbl, str) end
+  local args = {wrt = wrt}
+  M.export(node, '', args)
+  local str = table.concat(tbl)
+  return str
 end
 
 local function split_str(inputstr, sep)
@@ -260,14 +276,12 @@ end
 
 function M.format_attrib(node)
   local str = ""
-  sep = " "
-  for k, v in ipairs(node.attrib) do
-    str = str .. f('%s%s="%s"', sep, node.attrib[k], node.attrib[v])
-    sep = " "
+  local sep = " "
+  for k, v in pairs(node.attrib) do
+    str = str .. f('%s%s="%s"', sep, k, v)
   end
   for k, v in pairs(node.nsmap) do
     str = str .. f('%sxmlns:%s="%s"', sep, k, v)
-    sep = " "
   end
   return str
 end
@@ -307,7 +321,7 @@ function M.test(args)
       outfile = io.open(args.outfilepath, 'w')
       args.wrt = function (s) outfile:write(s) end
     else
-      args.wrt = wrt
+      args.wrt = function (s) io.stdout:write(s) end
     end
     M.export(tree, '', args)
     if args.outfilepath then

@@ -1,4 +1,4 @@
-# lua_xml_tree
+# xml_tree
 
 Supports the ability in Lua to create a recursively nested tree of
 nodes from an XML document/file.
@@ -13,3 +13,9 @@ $ lua xml_tree.lua infilename.xml
 $ lua xml_tree.lua infilename.xml --outfilepath=output.xml
 ```
 
+Module `src/xml_tree.lua` provides public functions for each of the
+following (among others):
+
+- Convert an XML document (file) to a tree of nodes -- `xml_tree.to_tree`
+
+- Convert a tree of nodes to a string -- `xml_tree.to_string`
