@@ -1,5 +1,5 @@
 package = "xml_tree"
-version = "1.0-1"
+version = "1.0-2"
 source = {
   url = "git://github.com/dkuhlman/xml_tree",
   tag = "v1.0"
@@ -25,7 +25,7 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      xml_tree = "xml_tree.lua"
+      xml_tree = "src/xml_tree.lua"
    }
 }
 
