@@ -20,12 +20,13 @@ description = {
 dependencies = {
   "lua >= 5.4",
   "argparse",
-  "luaexpat"
+  "luaexpat",
+  "luatable",
 }
 build = {
    type = "builtin",
    modules = {
-      xml_tree = "src/xml_tree.lua"
+      xml_tree = "src/xml_tree.lua",
    }
 }
 

@@ -6,7 +6,8 @@ Usage: script [-h] [-o <outfilepath>] [-t] [-s] <infilepath>
 
 Synopsis:
     Parse an XML file;
-    build a tree of elements (XmlElementClass).
+    Build a tree of elements (XmlElementClass).
+    Display the tree of elements.
 
 Arguments:
    infilepath            Input XML file path (name)
@@ -36,6 +37,8 @@ Usage in Lua REPL:
 
 local argparse = require("argparse")
 local lxp = require("lxp")
+local luatable = require("luatable")
+
 local M = {}
 
 local f = string.format
@@ -144,6 +147,7 @@ function XmlParserClass:end_element(_, _)
   if #self.elstack > 0 then
     local current = self.elstack[#self.elstack]
     table.insert(current.children, child)
+    child.parent = current
   else
     self.root = child
   end
@@ -232,6 +236,7 @@ function M.to_tree(infilename, trim)
   return cb_object.root
 end
 
+-- Convert a tree of XML elements (nodes) to an XML string.
 function M.to_string(node)
   local tbl = {}
   local wrt = function (str) table.insert(tbl, str) end
@@ -245,11 +250,11 @@ local function split_str(inputstr, sep)
   if sep == nil then
     sep = "%s" -- Default separator is whitespace
   end
-  local t = {}
+  local tbl = {}
   for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-    table.insert(t, str)
+    table.insert(tbl, str)
   end
-  return t
+  return tbl
 end
 
 local function reverse_map(nsmap)
@@ -260,8 +265,9 @@ local function reverse_map(nsmap)
   return revnsmap
 end
 
+-- Format the tag as in Python Lxml: "{namespace-uri}unqualified-name".
 function M.format_tag(orig_tag, nsmap)
-  local gname
+  local qname
   local revnsmap = reverse_map(nsmap)
   local tbl = split_str(orig_tag, '}')
   if #tbl == 2 then
@@ -274,20 +280,23 @@ function M.format_tag(orig_tag, nsmap)
   return qname
 end
 
+-- Format the attributes as the would appear in an XML file: 'name="value" ...'.
 function M.format_attrib(node)
   local str = ""
   local sep = " "
   for k, v in pairs(node.attrib) do
     str = str .. f('%s%s="%s"', sep, k, v)
   end
-  for k, v in pairs(node.nsmap) do
-    str = str .. f('%sxmlns:%s="%s"', sep, k, v)
+  if not node.parent or not luatable.equal(node.nsmap, node.parent.nsmap, true) then
+    for k, v in pairs(node.nsmap) do
+      str = str .. f('%sxmlns:%s="%s"', sep, k, v)
+    end
   end
   return str
 end
 
 --
--- see https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
+-- See https://stackoverflow.com/questions/1091945/what-characters-do-i-need-to-escape-in-xml-documents
 function M.escape_text(text)
   local str = text
   str = string.gsub(str, '&', '&amp;')
@@ -295,6 +304,7 @@ function M.escape_text(text)
   return str
 end
 
+-- Export (print) a tree of XML elements (nodes) to an XML file.
 function M.export(node, indent, args)
   local attrib_str = M.format_attrib(node)
   local tag_str = M.format_tag(node.tag, node.nsmap)
@@ -337,7 +347,8 @@ function main()
     [[
 Synopsis:
     Parse an XML file;
-    build a tree of elements (XmlElementClass). ]]
+    Build a tree of elements (XmlElementClass).
+    Display the tree of elements. ]]
     )
   parser:argument(
     "infilepath",
@@ -357,10 +368,6 @@ Synopsis:
     )
   local args = parser:parse()
   M.test(args)
-end
-
-function M.dbg()
-  print('test 03')
 end
 
 if pcall(debug.getlocal, 4, 1) then
